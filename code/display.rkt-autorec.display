@@ -1,0 +1,11 @@
+#lang racket
+
+;------Besturingsystemen:taak->raspberry-pi-------------
+
+(require "../raspi-gpio.rkt")
+
+
+
+
+(gpio-mcp23017-setup)
+

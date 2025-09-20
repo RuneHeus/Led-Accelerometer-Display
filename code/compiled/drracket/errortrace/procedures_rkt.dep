@@ -1,0 +1,1 @@
+("8.8" ta6nt ("f0af93505884ec9cceeb28bdcf5698fb20555602" . "9a1e82d78ef82cf10ae10f7dc88eec191410f41a") #"Z:\\taak\\..\\raspi-gpio.rkt" (collects #"drracket" #"private" #"drracket-errortrace-key.rkt") (collects #"racket" #"main.rkt") (collects #"racket" #"runtime-config.rkt"))

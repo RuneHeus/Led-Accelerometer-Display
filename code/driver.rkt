@@ -1,0 +1,80 @@
+#lang racket
+
+(require "raspi-gpio-taak.rkt")
+
+(require "lsm303d.rkt")
+
+(provide (all-defined-out))
+
+(define (connect-lsm303d)
+  (let* ((dev-id #x1d)
+         (fd (gpio-i2c-setup dev-id))
+         (max-val-temp (- (expt 2 13) 1))
+         (max-val-acc (- (expt 2 16) 1)))
+    
+    (lsm303d-setup fd)
+
+    (define (negative? val) ; Negative if 12-th bit is 1
+      (not (= (bitwise-and val (expt 2 12)) 0)))
+
+    (define (mask-bits val type)
+      (if (eq? type 'temp)
+          (bitwise-and val max-val-temp)
+          (bitwise-and val max-val-acc)))
+
+    (define (lsm303d-temperature)
+      (let* ((lsb (gpio-i2c-read-reg8 fd LSM303D_TEMP_OUT_L))
+             (msb (* (gpio-i2c-read-reg8 fd LSM303D_TEMP_OUT_H) (expt 2 8)))
+             (combined-num (bitwise-ior lsb msb))
+             (offset #f))
+        
+        (set! combined-num (mask-bits combined-num 'temp))
+        
+        (if (negative? combined-num) 
+            (set! offset (- combined-num max-val-temp)) ; When negative convert to correct value
+            (set! offset combined-num)) ; When positive, no conversion needed
+
+        (set! offset (/ offset 8))
+        
+        (round (+ 25 offset)) ;Return Value in Celcius
+        ))
+
+    (define (lsm303d-acceleration)
+      (let* ((lsb-x (gpio-i2c-read-reg8 fd LSM303D_OUT_X_L_A))
+             (msb-x (gpio-i2c-read-reg8 fd LSM303D_OUT_X_H_A))
+             (lsb-y (gpio-i2c-read-reg8 fd LSM303D_OUT_Y_L_A))
+             (msb-y (gpio-i2c-read-reg8 fd LSM303D_OUT_Y_H_A))
+             (lsb-z (gpio-i2c-read-reg8 fd LSM303D_OUT_Z_L_A))
+             (msb-z (gpio-i2c-read-reg8 fd LSM303D_OUT_Z_H_A))
+             (combined-x (bitwise-ior lsb-x msb-x))
+             (combined-y (bitwise-ior lsb-y msb-y))
+             (combined-z (bitwise-ior lsb-z msb-z))
+             (lijst '())
+             (offset #f))
+
+        (set! combined-x (exact->inexact (/ combined-x 16384)))
+        (set! combined-y (exact->inexact (/ combined-x 16384)))
+        (set! combined-z (exact->inexact (/ combined-x 16384)))
+
+        (display combined-x)
+        (display " ")
+        (display combined-y)
+        (display " ")
+        (display combined-z)
+        (newline)
+
+        (set! lijst (list combined-x combined-y combined-z))
+
+        (do ((i 0 (+ i 1)))
+          ((= i (length lijst)))
+          (when (negative? (list-ref lijst i))
+              (set! lijst (list-set lijst i (- (list-ref lijst i) max-val-acc)))))
+
+        lijst
+        ))
+
+    (define (dispatch mes)
+      (cond ((eq? mes 'lsm303d-temperature)  lsm303d-temperature)
+            ((eq? mes 'lsm303d-acceleration) lsm303d-acceleration)
+            (else (display "Wrong message sent: ") (displayln mes))))
+    dispatch))
